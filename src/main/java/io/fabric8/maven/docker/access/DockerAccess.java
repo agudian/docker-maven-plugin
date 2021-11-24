@@ -13,6 +13,7 @@ import io.fabric8.maven.docker.model.ContainerDetails;
 import io.fabric8.maven.docker.model.ExecDetails;
 import io.fabric8.maven.docker.model.Image;
 import io.fabric8.maven.docker.model.Network;
+import io.fabric8.maven.docker.service.ArchiveService;
 
 /**
  * Access to the <a href="http://docs.docker.io/en/latest/reference/api/docker_remote_api/">Docker API</a> which
@@ -238,9 +239,10 @@ public interface DockerAccess {
      * @param image name of the image to build or <code>null</code> if none should be used
      * @param dockerArchive from which the docker image should be build
      * @param options additional query arguments to add when building the image. Can be null.
+     * @param archiveService
      * @throws DockerAccessException if docker host reports an error during building of an image
      */
-    void buildImage(String image, File dockerArchive, BuildOptions options) throws DockerAccessException;
+    void buildImage(String image, File dockerArchive, BuildOptions options, ArchiveService archiveService) throws DockerAccessException;
 
     /**
      * Alias an image in the repository with a complete new name. (Note that this maps to a Docker Remote API 'tag'

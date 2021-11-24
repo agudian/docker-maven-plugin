@@ -255,7 +255,7 @@ public class BuildServiceTest {
         new Verifications() {{
             docker.buildImage(imageConfig.getName(),
                               dockerBuildTar,
-                              (BuildOptions) any);
+                              (BuildOptions) any, archiveService);
         }};
     }
 
@@ -273,7 +273,7 @@ public class BuildServiceTest {
 
     private void whenBuildImage(boolean cleanup, boolean nocache) throws DockerAccessException, MojoExecutionException {
         new Expectations() {{
-            docker.buildImage(withEqual(imageConfig.getName()), (File) any, (BuildOptions) any);
+            docker.buildImage(withEqual(imageConfig.getName()), (File) any, (BuildOptions) any, archiveService);
         }};
         if (cleanup) {
             new Expectations() {{

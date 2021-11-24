@@ -70,7 +70,7 @@ public class DockerAccessWinIT {
     @Ignore
     public void testBuildImage() throws DockerAccessException {
         File file = new File("src/test/resources/integration/busybox-test.tar");
-        dockerClient.buildImage(IMAGE_TAG, file, null);
+        dockerClient.buildImage(IMAGE_TAG, file, null, null);
         assertTrue(hasImage(IMAGE_TAG));
 
         testRemoveImage(IMAGE_TAG);

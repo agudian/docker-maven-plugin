@@ -299,7 +299,7 @@ public class BuildService {
 
     private String doBuildImage(String imageName, File dockerArchive, BuildOptions options)
             throws DockerAccessException, MojoExecutionException {
-        docker.buildImage(imageName, dockerArchive, options);
+        docker.buildImage(imageName, dockerArchive, options, archiveService);
         return queryService.getImageId(imageName);
     }
 

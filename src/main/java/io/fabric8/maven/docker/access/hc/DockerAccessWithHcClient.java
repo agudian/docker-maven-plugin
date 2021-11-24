@@ -2,6 +2,7 @@ package io.fabric8.maven.docker.access.hc;
 
 import static java.net.HttpURLConnection.*;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -18,7 +19,9 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
+import io.fabric8.maven.docker.service.ArchiveService;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpResponseException;
@@ -65,6 +68,7 @@ import io.fabric8.maven.docker.util.ImageName;
 import io.fabric8.maven.docker.util.JsonFactory;
 import io.fabric8.maven.docker.util.Logger;
 import io.fabric8.maven.docker.util.TimestampFactory;
+import org.apache.maven.plugin.MojoExecutionException;
 
 /**
  * Implementation using <a href="http://hc.apache.org/">Apache HttpComponents</a>
@@ -280,14 +284,116 @@ public class DockerAccessWithHcClient implements DockerAccess {
     }
 
     @Override
-    public void buildImage(String image, File dockerArchive, BuildOptions options) throws DockerAccessException {
+    public void buildImage(String image, File dockerArchive, BuildOptions options, ArchiveService archiveService) throws DockerAccessException {
         try {
+            if (hasMultiplePlatformsRequested(options)) {
+                // Todo: docker buildx create --driver docker-container --use
+                // docker buildx inspect --bootstrap
+
+                // TODO: check if we can re-use non-archived files instead of unpacking again
+                final File destinationDirectory = new File(dockerArchive.getParentFile(), "extracted");
+                destinationDirectory.mkdirs();
+                archiveService.extractDockerCopyArchive(dockerArchive, destinationDirectory);
+
+                // run buildKit
+                log.info("Building with BuildKit to create all desired platform images");
+                runBuildxBuild(image, options, destinationDirectory, false);
+
+                log.info("Building with BuildKit again (using caches) only for the current platform to load it to your local Docker environment");
+                runBuildxBuild(image, options, destinationDirectory, true);
+
+                return;
+            }
+
             String url = urlBuilder.buildImage(image, options);
             log.verbose(Logger.LogVerboseCategory.API, API_LOG_FORMAT_POST_FILE, url, dockerArchive);
             delegate.post(url, dockerArchive, createBuildResponseHandler(), HTTP_OK);
-        } catch (IOException e) {
+        } catch (IOException | MojoExecutionException | InterruptedException e) {
             throw new DockerAccessException(e, "Unable to build image [%s]", image);
         }
+    }
+
+    private void runBuildxBuild(String image, BuildOptions options, File destinationDirectory, boolean load) throws IOException, InterruptedException {
+        List<String> commandLine = new ArrayList<>();
+        commandLine.add("docker");
+        commandLine.add("buildx");
+        commandLine.add("build");
+        commandLine.add("--tag");
+        commandLine.add(image);
+        for (Map.Entry<String, String> entry : options.getOptions().entrySet()) {
+            String k = entry.getKey();
+            String v = entry.getValue();
+
+            switch (k) {
+                case "nocache":
+                    if (!load) {
+                        commandLine.add("--no-cache");
+                    }
+                    break;
+                case "networkmode":
+                    commandLine.add("network");
+                    commandLine.add(v);
+                    break;
+                case "buildargs":
+                    commandLine.add("--build-arg");
+                    commandLine.add(v);
+                    break;
+                case "cachefrom":
+                    commandLine.add("--cache-from");
+                    commandLine.add(v);
+                    break;
+                case "dockerfile":
+                    commandLine.add("--file");
+                    commandLine.add(v);
+                    break;
+                case "forcerm":
+                    commandLine.add("--force-rm");
+                    break;
+                case "squash":
+                    if("1".equals(v)) {
+                        commandLine.add("--squash");
+                    }
+                    break;
+                case "platform":
+                    if (!load) {
+                        commandLine.add("--platform");
+                        commandLine.add(v);
+                    }
+                    break;
+                default:
+            }
+        }
+
+        // todo: is the name of the Dockerfile always "Dockerfile" in this case?
+        commandLine.add(destinationDirectory.getPath());
+
+        if (load) {
+            commandLine.add("--load");
+        }
+
+        final int exitCode = executeCommandLine(commandLine);
+        if (exitCode != 0) {
+            throw new DockerAccessException("Unable to build image [%s]. Docker buildx finished with code %d.", image, exitCode);
+        }
+    }
+
+    private int executeCommandLine(List<String> commandLine) throws IOException, InterruptedException {
+        log.info("Executing: " + String.join(" ", commandLine));
+
+        final Process buildProcess = Runtime.getRuntime().exec(commandLine.toArray(new String[0]));
+
+        new Thread(new ProcessStreamConsumer(buildProcess.getInputStream())).start();
+        new Thread(new ProcessStreamConsumer(buildProcess.getErrorStream())).start();
+
+        return buildProcess.waitFor();
+    }
+
+    private boolean hasMultiplePlatformsRequested(BuildOptions options) {
+        if (options != null) {
+            final String platform = options.getOptions().get("platform");
+            return StringUtils.isNotEmpty(platform) && platform.contains(",");
+        }
+        return false;
     }
 
     @Override
@@ -837,5 +943,25 @@ public class DockerAccessWithHcClient implements DockerAccess {
 				targetImage
 			);
 		}
+    }
+
+    private class ProcessStreamConsumer implements Runnable {
+        private final BufferedReader reader;
+
+        public ProcessStreamConsumer(InputStream inputStream) {
+            this.reader = new BufferedReader(new InputStreamReader(inputStream));
+        }
+
+        @Override
+        public void run() {
+            String line;
+            try {
+                while ((line = reader.readLine()) != null) {
+                    log.info(line);
+                }
+            } catch (IOException e) {
+                log.error(e.getMessage());
+            }
+        }
     }
 }
