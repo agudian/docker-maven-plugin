@@ -16,7 +16,9 @@
  */
 package io.fabric8.maven.docker.service;
 
+import io.fabric8.maven.docker.access.BuildxTracker;
 import io.fabric8.maven.docker.access.DockerAccess;
+import io.fabric8.maven.docker.access.DockerBuildx;
 import io.fabric8.maven.docker.assembly.DockerAssemblyManager;
 import io.fabric8.maven.docker.log.LogOutputSpecFactory;
 import io.fabric8.maven.docker.util.Logger;
@@ -47,7 +49,7 @@ public class ServiceHub {
     private final WaitService waitService;
     private final DockerAssemblyManager dockerAssemblyManager;
 
-    ServiceHub(DockerAccess dockerAccess, ContainerTracker containerTracker, BuildPluginManager pluginManager,
+    ServiceHub(DockerAccess dockerAccess, ContainerTracker containerTracker, BuildxTracker buildxTracker, BuildPluginManager pluginManager,
                DockerAssemblyManager dockerAssemblyManager, MavenProject project, MavenSession session,
                Logger logger, LogOutputSpecFactory logSpecFactory) {
 
@@ -56,12 +58,13 @@ public class ServiceHub {
 
         mojoExecutionService = new MojoExecutionService(project, session, pluginManager);
         archiveService = new ArchiveService(dockerAssemblyManager, logger);
+        DockerBuildx dockerBuildx = new DockerBuildx(buildxTracker);
 
         if (dockerAccess != null) {
             queryService = new QueryService(dockerAccess);
             registryService = new RegistryService(dockerAccess, logger);
             runService = new RunService(dockerAccess, queryService, containerTracker, logSpecFactory, logger);
-            buildService = new BuildService(dockerAccess, queryService, registryService, archiveService, logger);
+            buildService = new BuildService(dockerAccess, queryService, registryService, archiveService, dockerBuildx, logger);
             volumeService = new VolumeService(dockerAccess);
             watchService = new WatchService(archiveService, buildService, dockerAccess, mojoExecutionService, queryService, runService, logger);
             waitService = new WaitService(dockerAccess, queryService, logger);

@@ -1,5 +1,6 @@
 package io.fabric8.maven.docker.service;
 
+import io.fabric8.maven.docker.access.BuildxTracker;
 import io.fabric8.maven.docker.access.DockerAccess;
 import io.fabric8.maven.docker.assembly.DockerAssemblyManager;
 import io.fabric8.maven.docker.util.Logger;
@@ -19,6 +20,9 @@ public class ServiceHubFactory {
     // Track started containers
     private final ContainerTracker containerTracker = new ContainerTracker();
 
+    /** Tracks usage of buildx resources */
+    private final BuildxTracker buildxTracker = new BuildxTracker();
+
     @Requirement
     protected BuildPluginManager pluginManager;
 
@@ -29,7 +33,7 @@ public class ServiceHubFactory {
 
     public ServiceHub createServiceHub(MavenProject project, MavenSession session, DockerAccess access, Logger log, LogOutputSpecFactory logSpecFactory) {
         this.logOutputSpecFactory = logSpecFactory;
-        return new ServiceHub(access, containerTracker, pluginManager, dockerAssemblyManager, project, session,
+        return new ServiceHub(access, containerTracker, buildxTracker, pluginManager, dockerAssemblyManager, project, session,
                               log, logSpecFactory);
     }
 

@@ -4,8 +4,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import io.fabric8.maven.docker.access.BuildOptions;
+import io.fabric8.maven.docker.access.BuildxTracker;
 import io.fabric8.maven.docker.access.DockerAccess;
 import io.fabric8.maven.docker.access.DockerAccessException;
+import io.fabric8.maven.docker.access.DockerBuildx;
 import io.fabric8.maven.docker.assembly.DockerAssemblyManager;
 import io.fabric8.maven.docker.config.AssemblyConfiguration;
 import io.fabric8.maven.docker.config.BuildImageConfiguration;
@@ -42,13 +44,15 @@ public class BuildService {
     private final QueryService queryService;
     private final ArchiveService archiveService;
     private final RegistryService registryService;
+    private final DockerBuildx dockerBuildx;
     private final Logger log;
 
-    BuildService(DockerAccess docker, QueryService queryService, RegistryService registryService, ArchiveService archiveService, Logger log) {
+    BuildService(DockerAccess docker, QueryService queryService, RegistryService registryService, ArchiveService archiveService, DockerBuildx dockerBuildx, Logger log) {
         this.docker = docker;
         this.queryService = queryService;
         this.registryService = registryService;
         this.archiveService = archiveService;
+        this.dockerBuildx = dockerBuildx;
         this.log = log;
     }
 
